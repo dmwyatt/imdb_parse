@@ -1,0 +1,5 @@
+.project
+.pydevproject
+*.db
+*.pyc
+imdb_parse
