@@ -931,16 +931,16 @@ class Subquery( Util, Answer, Deletion ):
      def diccomma( self, csvstr, table=Base.tab0, wild=True, POP=False ):
           '''Get dictionary where notes match comma separated values.'''
           parlist  = self.comma2list( csvstr, wild )
+          print "PARLIST: %s" % parlist
           subquery = self.notesglob( parlist )
           return self.dicsub( subquery, parlist, table, POP )
 
-     def selectdic( self, dual=1, table=Base.tab0, POP=False ):
+     def selectdic( self, dual=1, table=Base.tab0, POP=False, wild=True ):
           '''Alias "selectdic":         diclast  OR diccomma.'''
           #  assuming dual is either an ^integer OR ^csvstr string...
           if isinstance( dual, int ):
                return self.diclast(  dual, table,       POP )
           else:
-               wild = True
                #      ^constrained for dual usage
                return self.diccomma( dual, table, wild, POP )
 

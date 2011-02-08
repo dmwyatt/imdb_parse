@@ -1,10 +1,12 @@
+from imdb import IMDb
 import datetime
 import operator
+import pprint
 import re
 import shelve
-
-from imdb import IMDb
 import y_serial_v060 as yserial
+import os
+
 
 class ImdbParser():
     ''' Parses Movie() objects from IMDBpy
@@ -243,12 +245,26 @@ class ImdbWonders(ImdbParser):
     ''' General front-end to IMDBpy.
     '''
     def __init__(self, cache=True):
+        self.cache = cache
         self.imdbpy = self.getImdbpy()
         self.cachefile = "imdb_cache.db"
         self.defaultExpTime= datetime.timedelta(days=30)
         self.imdbpyRequiredInfo = ['main', 'plot', 'release dates', 'akas', 'taglines', 'dvd']
-        if cache:
-            self.cache = yserial.Main(self.cachefile)
+        if self.cache:
+            self.cachedb = yserial.Main(self.cachefile)
+            if not os.path.exists(self.cachefile):
+                self.init_tables()
+            elif not os.path.getsize(self.cachefile):
+                self.init_tables()
+    
+    def init_tables(self):
+        self.cachedb.insert("test", "init", "searchMovie")
+        self.cachedb.insert("test", "init", "getInfo")
+    def is_expired(self, time, expiry_time):
+        time = datetime.datetime.fromtimestamp(time)
+        if time > datetime.datetime.now() - expiry_time:
+            return False
+        return True
 
     def getImdbpy(self, access = 'http', module = 'beautifulsoup'):
         ''' Returns an IMDb() object
@@ -261,7 +277,9 @@ class ImdbWonders(ImdbParser):
             
             After selecting a result, pass it to self.expandInfo() to get the rest of the information.
         '''
-        results = self.fetchCache(text.lower())
+        cache_table = "searchMovie"
+        notes= [re.sub(" +", "_", text.lower())]
+        results = self.fetchCache(notes, cache_table)
         if results:
             return results
 
@@ -273,6 +291,7 @@ class ImdbWonders(ImdbParser):
                 for title in titles:
                     if title.lower() == text.lower():
                         imdbpyMatches.append(result)
+        import pdb; pdb.set_trace()
 
         exactMatch = []
         subMatch = []
@@ -300,38 +319,63 @@ class ImdbWonders(ImdbParser):
 
         resultset = [self.buildInfo(movie) for movie in sortedMatches]
 
-        self.putCache(resultset, text.lower(), datetime.timedelta(days=10))
+        self.putCache(resultset, notes, cache_table)
 
         return resultset
 
-    def fetchCache(self, key):
+    def fetchCache(self, notes, table):
         ''' Return cached info or None if it's not cached or expired
+            
+            cached objects are in a dict that looks like this:
+                {'_expiration': expiration, 'data': obj}
         '''
-        #TODO: Implement plugin-based caching mechanism
-        cache = shelve.open(self.cachefile)
+        
+        if not self.cache:
+            return
+        notes = ','.join(notes)
+        
+        print "searching with %s, %s" % (notes, table)
+        cache_dict = self.cachedb.selectdic(notes, table, wild = False)
+         
+        if len(cache_dict) > 1:
+            #shouldn't ever have multiple results
+            self.cachedb.delete(notes, table)
+            return
+        else:
+            for key in cache_dict:
+                cached = cache_dict[key]       
 
-        if cache.has_key(key):
-            cachedObj = cache[key]
-            if cachedObj['_cachedTime'] > datetime.datetime.now() - cachedObj['_expiration']:
-                cache.close()
+        if cache_dict:
+            cachedObj = cached[2]
+            if self.is_expired(cached[0], cachedObj['_expiration']):
+                print "...is expired, deleting"
+                self.cachedb.delete(notes, table)
+                return
+            else:
+#                print "fetched:"
+#                pprint.pprint(cachedObj['data']['title'])
+#                print "*************************************************\n******************************************"
                 return cachedObj['data']
 
-        cache.close()
-
-    def putCache(self, obj, key, expiration = None):
+    def putCache(self, obj, notes, table, expiration = None):
         ''' Puts item into the cache.
 
-            'key' will be the key to access the item from the cache
             'expiration' should be a datetime.timedelta, which defaults to self.defaultExpTime
         '''
+        if not self.cache:
+            return
         if not expiration:
             expiration = self.defaultExpTime
-
-        cacheMe = {'_cachedTime': datetime.datetime.now(), '_expiration': expiration, 'data': obj}
-
-        cache = shelve.open(self.cachefile)
-        cache[key] = cacheMe
-        cache.close()
+        
+        notes = ', '.join(notes)
+        cacheMe = {'_expiration': expiration, 'data': obj}
+        
+        print "Caching..."
+        print "...%s" % cacheMe
+        print "...%s" % notes
+        print "...%s" % table
+        
+        self.cachedb.insert(cacheMe, notes, table)
 
     def _getMovie(self, imdbid):
         ''' Returns an imdbpy Movie() object for imdbid that has been updated with the info required
@@ -354,8 +398,10 @@ class ImdbWonders(ImdbParser):
     def getInfo(self, imdbid):
         ''' Returns movie information via self.buildInfo() or via a cached version if available.
         '''
+        table = "getInfo"
         imdbid = str(imdbid).replace('tt', '')
-        isCached = self.fetchCache(imdbid)
+
+        isCached = self.fetchCache([imdbid], table)
 
         if not isCached:
             #movie isn't cached so go get it from IMDb
@@ -366,7 +412,7 @@ class ImdbWonders(ImdbParser):
         movieInfo = self.buildInfo(movie)
 
         #Since movie isn't cached, cache it
-        self.putCache(movieInfo, imdbid)
+        self.putCache(movieInfo, [imdbid], table)
         return movieInfo
 
     def buildInfo(self, imdbMovie):
@@ -409,7 +455,7 @@ class ImdbWonders(ImdbParser):
         return imdbInfo
     
 i = ImdbWonders()
-basicInfo = i.searchMovie("The Matrix")
-import pprint
-#pprint.pprint(basicInfo)
-pprint.pprint(i.expandInfo(basicInfo[0]))
+basicInfo = i.searchMovie("Matrix")
+
+expandedInfo = i.expandInfo(basicInfo[0])
+#pprint.pprint(expandedInfo)
