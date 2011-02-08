@@ -931,7 +931,6 @@ class Subquery( Util, Answer, Deletion ):
      def diccomma( self, csvstr, table=Base.tab0, wild=True, POP=False ):
           '''Get dictionary where notes match comma separated values.'''
           parlist  = self.comma2list( csvstr, wild )
-          print "PARLIST: %s" % parlist
           subquery = self.notesglob( parlist )
           return self.dicsub( subquery, parlist, table, POP )
 
