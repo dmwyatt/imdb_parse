@@ -77,20 +77,21 @@ class ImdbParser():
         months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
         if imdbMovie.has_key('runtimes'):
             rDates = {}
-            for releaseDate in imdbMovie['release dates']:
-                search = re.search(r"(?P<country>\w+)::(?P<date>\d{1,2} \w+ \d\d\d\d)( (?P<note>\(.*\)))?", releaseDate)
-                if search:
-                    country, date, note = search.group('country', 'date', 'note')
-                    day, month, year = date.split()
-                    month = months.index(month) + 1
-                    date = datetime.date(int(year), int(month), int(day))
-                    dn = {'date': date, 'note': note}
-                    if country not in rDates:
-                        rDates[country] = [dn]
-                    else:
-                        if dn not in rDates[country]:
-                            rDates[country].append(dn)
-            return rDates
+            if imdbMovie.has_key('release dates'):
+                for releaseDate in imdbMovie['release dates']:
+                    search = re.search(r"(?P<country>\w+)::(?P<date>\d{1,2} \w+ \d\d\d\d)( (?P<note>\(.*\)))?", releaseDate)
+                    if search:
+                        country, date, note = search.group('country', 'date', 'note')
+                        day, month, year = date.split()
+                        month = months.index(month) + 1
+                        date = datetime.date(int(year), int(month), int(day))
+                        dn = {'date': date, 'note': note}
+                        if country not in rDates:
+                            rDates[country] = [dn]
+                        else:
+                            if dn not in rDates[country]:
+                                rDates[country].append(dn)
+                return rDates
 
     def title(self, imdbMovie):
         ''' Return the main title for this movie according to IMDb
@@ -270,11 +271,15 @@ class ImdbWonders(ImdbParser):
         '''
         return IMDb(access, useModule = module)
 
-    def searchMovie(self, text):
+    def searchMovie(self, text, exact=False):
         ''' Returns a list of movie dicts as returned by self.buildInfo(). These are sparsely populated dicts with
             just a minimum amount of info mainly including titles and year.
             
             After selecting a result, pass it to self.expandInfo() to get the rest of the information.
+            
+            By default we do subtext matching of all titles for each possible result.  This means a search for 
+            "pirates" will also return "Pirates of the Caribbean: The Curse of the Black Pearl".  If you want 
+            exact matches, pass exact=True.
         '''
         cache_table = "searchMovie"
         notes= [re.sub(" +", "_", text.lower())]
@@ -284,13 +289,19 @@ class ImdbWonders(ImdbParser):
 
         searchResults = self.imdbpy.search_movie(text)
         imdbpyMatches = []
+        import pdb; pdb.set_trace()
         for result in searchResults:
             if 'movie' in result['kind']:
                 titles = self.getAllTitles(result)
                 for title in titles:
-                    if title.lower() == text.lower():
+                    if exact:
+                        if title.lower() == text.lower():
+                            imdbpyMatches.append(result)
+                            break
+                    elif text.lower() in title.lower():
                         imdbpyMatches.append(result)
-        import pdb; pdb.set_trace()
+                        break
+        
 
         exactMatch = []
         subMatch = []
@@ -309,7 +320,7 @@ class ImdbWonders(ImdbParser):
         exactMatch.sort(key = operator.itemgetter("title", "year"), reverse=True)
         subMatch.sort(key = operator.itemgetter("title", "year"), reverse=True)
         superMatch.sort(key = operator.itemgetter("title", "year"), reverse=True)
-        otherMatch.sort(key = operator.itemgetter("title", "year"), reverse=True)
+        otherMatch.sort(key = operator.itemgetter("title", "year"), reverse=True)        
 
         sortedMatches = exactMatch
         sortedMatches.extend(subMatch)
@@ -351,9 +362,6 @@ class ImdbWonders(ImdbParser):
                 self.cachedb.delete(notes, table)
                 return
             else:
-#                print "fetched:"
-#                pprint.pprint(cachedObj['data']['title'])
-#                print "*************************************************\n******************************************"
                 return cachedObj['data']
 
     def putCache(self, obj, notes, table, expiration = None):
@@ -456,5 +464,5 @@ class ImdbWonders(ImdbParser):
 i = ImdbWonders()
 basicInfo = i.searchMovie("pirates")
 
-expandedInfo = i.expandInfo(basicInfo[0])
-pprint.pprint(expandedInfo)
+for movie in basicInfo:
+    print "%s (%s)" % (movie.get('title'), movie.get('year'))
