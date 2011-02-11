@@ -3,7 +3,6 @@ import datetime
 import operator
 import pprint
 import re
-import shelve
 import y_serial_v060 as yserial
 import os
 
@@ -455,7 +454,7 @@ class ImdbWonders(ImdbParser):
         return imdbInfo
     
 i = ImdbWonders()
-basicInfo = i.searchMovie("Matrix")
+basicInfo = i.searchMovie("pirates")
 
 expandedInfo = i.expandInfo(basicInfo[0])
-#pprint.pprint(expandedInfo)
+pprint.pprint(expandedInfo)
