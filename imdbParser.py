@@ -15,16 +15,16 @@ class ImdbParser():
         '''
         return [str(x) for x in objList]
 
-    def getAllTitles(self, imdbMovie):
+    def getAllTitles(self, imdbMovie, globalTitles = True):
         ''' Return a list of every possible thing this movie could be called.
             This includes the official title,
         '''
         titles = [imdbMovie['title']]
-
         titles.extend(self.titles(imdbMovie))
-        akas = self.alternateTitles(imdbMovie)
-        if akas:
-            titles.extend(akas.keys())
+        if globalTitles:
+            akas = self.alternateTitles(imdbMovie)
+            if akas:
+                titles.extend(akas.keys())
 
         #return a de-duplicated list of titles
         return list(dict.fromkeys(titles))
@@ -271,7 +271,7 @@ class ImdbWonders(ImdbParser):
         '''
         return IMDb(access, useModule = module)
 
-    def searchMovie(self, text, exact=False):
+    def searchMovie(self, text, exact=False, globalTitles=True):
         ''' Returns a list of movie dicts as returned by self.buildInfo(). These are sparsely populated dicts with
             just a minimum amount of info mainly including titles and year.
             
@@ -289,10 +289,10 @@ class ImdbWonders(ImdbParser):
 
         searchResults = self.imdbpy.search_movie(text)
         imdbpyMatches = []
-        import pdb; pdb.set_trace()
+
         for result in searchResults:
             if 'movie' in result['kind']:
-                titles = self.getAllTitles(result)
+                titles = self.getAllTitles(result, globalTitles = globalTitles)
                 for title in titles:
                     if exact:
                         if title.lower() == text.lower():
@@ -374,11 +374,6 @@ class ImdbWonders(ImdbParser):
         notes = ', '.join(notes)
         cacheMe = {'_expiration': expiration, 'data': obj}
         
-        print "Caching..."
-        print "...%s" % cacheMe
-        print "...%s" % notes
-        print "...%s" % table
-        
         self.cachedb.insert(cacheMe, notes, table)
 
     def _getMovie(self, imdbid):
@@ -459,7 +454,9 @@ class ImdbWonders(ImdbParser):
         return imdbInfo
     
 i = ImdbWonders()
-basicInfo = i.searchMovie("pirates")
+i.cache = None
+basicInfo = i.searchMovie("pirates", globalTitles = False)
+#print basicInfo
 
-for movie in basicInfo:
-    print "%s (%s)" % (movie.get('title'), movie.get('year'))
+#for movie in basicInfo:
+#    print "%s (%s)" % (movie.get('title'), movie.get('year'))
