@@ -302,7 +302,6 @@ class ImdbWonders(ImdbParser):
                         imdbpyMatches.append(result)
                         break
         
-
         exactMatch = []
         subMatch = []
         superMatch = []
@@ -344,7 +343,6 @@ class ImdbWonders(ImdbParser):
             return
         notes = ','.join(notes)
         
-        print "searching with %s, %s" % (notes, table)
         cache_dict = self.cachedb.selectdic(notes, table, wild = False)
          
         if len(cache_dict) > 1:
@@ -358,7 +356,6 @@ class ImdbWonders(ImdbParser):
         if cache_dict:
             cachedObj = cached[2]
             if self.is_expired(cached[0], cachedObj['_expiration']):
-                print "...is expired, deleting"
                 self.cachedb.delete(notes, table)
                 return
             else:
